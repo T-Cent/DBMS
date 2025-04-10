@@ -2,12 +2,10 @@ import dearpygui.dearpygui as dpg # type: ignore
 import psycopg2 # type: ignore
 import re
 
-# Initialize DearPyGUI
 dpg.create_context()
 dpg.create_viewport(title="Nebula Core", width=600, height=400)
 dpg.setup_dearpygui()
 
-# Variables to store username and password
 username = ""
 password = ""
 items = [
@@ -27,12 +25,11 @@ items = [
 ]
 conn = None
 
+#? Function to sanitize SQL clauses to prevent SQL injection
 def sanitize(clause):
-    """Basic sanitization for WHERE clauses."""
     if not clause:
         return ""
         
-    # Check for typical SQL injection patterns
     suspicious_patterns = [
         r';\s*', r'--', r'/\*', r'\*/', r'DROP\s+', r'DELETE\s+',
         r'UPDATE\s+', r'INSERT\s+', r'ALTER\s+', r'UNION\s+'
@@ -44,19 +41,18 @@ def sanitize(clause):
     
     return clause
 
-# Callback function for login button
+#? Log in as user postgres to access Nebula Core, psycopg2 will throw an error if the connection fails
 def login_button_callback():
     entered_username = dpg.get_value("username_input")
     entered_password = dpg.get_value("password_input")
     
-    # In a real application, you would validate credentials here
     dpg.hide_item("login_window")
     dpg.show_item("main_window")
     
     global conn
     try:
         conn = psycopg2.connect(f"dbname='Nebula Core' user={entered_username} password={entered_password}")
-        dpg.set_value("welcome_text", f"Welcome, {entered_username}!")
+        # dpg.set_value("welcome_text", f"Welcome, {entered_username}!")
     except psycopg2.OperationalError as e:
         dpg.set_value("welcome_text", f"Login failed: {e}")
         dpg.show_item("login_window")
@@ -67,43 +63,60 @@ def run_query():
     select_query = sanitize(dpg.get_value("query_select_input"))
     from_query = sanitize(dpg.get_value("query_from_input"))
     where_query = sanitize(dpg.get_value("query_where_input"))
+    order_query = sanitize(dpg.get_value("query_order_input"))
+    group_query = sanitize(dpg.get_value("query_group_input"))
+    limit_query = sanitize(dpg.get_value("query_limit_input"))
+    join_query = sanitize(dpg.get_value("query_join_input"))
+    on_query = sanitize(dpg.get_value("query_on_input"))
     
     # Clear previous results
     dpg.delete_item("query_results", children_only=True)
+
+    query = rf"SELECT {select_query} FROM {from_query}"
     
+    if join_query:  
+        query += f" JOIN {join_query}"
+    if on_query:    
+        query += f" ON {on_query}"
     if where_query:
-        query = f"SELECT {select_query} FROM {from_query} WHERE {where_query};"
-    else:   
-        query = f"SELECT {select_query} FROM {from_query};"
+        query += f" WHERE {where_query}"
+    if group_query:
+        query += f" GROUP BY {group_query}"
+    if order_query:
+        query += f" ORDER BY {order_query}"  
+    if limit_query:
+        query += f" LIMIT {limit_query}"
+        
+    query += ";"
     
     try:
         with conn.cursor() as cur:
+            conn.rollback()
             cur.execute(query)
             headers = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
             
-            # Add headers
-            header_row = "| "
-            for header in headers:
-                header_row += f"{header} | "
-            dpg.add_text(header_row, parent="query_results")
+            # Create a table for the results
+            with dpg.table(tag="results_table", header_row=True, policy=dpg.mvTable_SizingStretchProp,
+                          borders_innerH=True, borders_outerH=True, borders_innerV=True,
+                          borders_outerV=True, parent="query_results", height=300):
+                
+                # Add columns
+                for header in headers:
+                    dpg.add_table_column(label=header)
+                
+                # Add rows
+                for row_data in rows:
+                    with dpg.table_row():
+                        for cell in row_data:
+                            # Convert all values to string for display
+                            dpg.add_text(str(cell) if cell is not None else "NULL")
+                
+            dpg.set_value("query_status", f"Query executed successfully. {len(rows)} rows returned.")
             
-            # Add separator
-            separator = "-" * len(header_row)
-            dpg.add_text(separator, parent="query_results")
-            
-            # Add rows
-            row_count = 0
-            for record in cur:
-                row = "| "
-                for value in record:
-                    row += f"{value} | "
-                dpg.add_text(row, parent="query_results")
-                row_count += 1
-            
-            # Add summary
-            dpg.add_text(f"\n{row_count} rows returned", parent="query_results")
             
     except Exception as e:
+        conn.rollback()
         dpg.add_text(f"Error executing query: {e}", color=[255, 0, 0], parent="query_results")
     
 # Create login window
@@ -127,14 +140,14 @@ with dpg.window(tag="login_window", label="Login", width=600, height=400, no_clo
 # Create main window (initially hidden) with scrollbars
 with dpg.window(tag="main_window", label="Main Application", width=600, height=400, show=False, no_close=True, horizontal_scrollbar=True):
     dpg.add_text("", tag="welcome_text")
-    dpg.add_spacer(height=20)
+    # dpg.add_spacer(height=20)
     dpg.add_text("Logged in and connected to Nebula Core!")
     dpg.add_spacer(height=20)
     
     # Query builder
     with dpg.group(horizontal=False):
-        dpg.add_text("BUILD YOUR QUERY")
-        dpg.add_separator()
+        # dpg.add_text("BUILD YOUR QUERY")
+        # dpg.add_separator()
         
         dpg.add_text("SELECT:")
         dpg.add_input_text(tag="query_select_input", width=400, default_value="*")
@@ -146,6 +159,26 @@ with dpg.window(tag="main_window", label="Main Application", width=600, height=4
         
         dpg.add_text("WHERE:")
         dpg.add_input_text(tag="query_where_input", width=400, default_value="")
+        dpg.add_spacer(height=10)
+        
+        dpg.add_text("ORDER BY:")
+        dpg.add_input_text(tag="query_order_input", width=400, default_value="")
+        dpg.add_spacer(height=10)
+        
+        dpg.add_text("GROUP BY:")
+        dpg.add_input_text(tag="query_group_input", width=400, default_value="")
+        dpg.add_spacer(height=10)
+        
+        dpg.add_text("LIMIT:")
+        dpg.add_input_text(tag="query_limit_input", width=400, default_value="")
+        dpg.add_spacer(height=10)
+        
+        dpg.add_text("JOIN:")
+        dpg.add_input_text(tag="query_join_input", width=400, default_value="")
+        dpg.add_spacer(height=10)
+        
+        dpg.add_text("ON:")
+        dpg.add_input_text(tag="query_on_input", width=400, default_value="")
         dpg.add_spacer(height=10)
         
         dpg.add_button(label="Run Query", callback=run_query, width=100)
@@ -160,6 +193,9 @@ with dpg.window(tag="main_window", label="Main Application", width=600, height=4
     with dpg.child_window(tag="query_results", width=-1, height=200, horizontal_scrollbar=True):
         # Results will be populated here when query runs
         dpg.add_text("Run a query to see results")
+        dpg.add_text(tag="query_status")
+        
+        
 
 dpg.show_viewport()
 dpg.set_primary_window("login_window", True)
