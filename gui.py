@@ -3,10 +3,8 @@ import psycopg2 # type: ignore
 import re
 from datetime import datetime
 
-# Initialize DearPyGUI
 dpg.create_context()
 
-# Set theme and global styling
 with dpg.theme() as global_theme:
     with dpg.theme_component(dpg.mvAll):
         dpg.add_theme_color(dpg.mvThemeCol_FrameBg, [30, 30, 40], category=dpg.mvThemeCat_Core)
@@ -17,17 +15,14 @@ with dpg.theme() as global_theme:
         dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 3, category=dpg.mvThemeCat_Core)
         dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 4, category=dpg.mvThemeCat_Core)
 
-# Apply theme
 dpg.bind_theme(global_theme)
 
-# Create viewport with larger dimensions
 dpg.create_viewport(title="Nebula Core Database Explorer", width=1200, height=800)
 dpg.setup_dearpygui()
 
-# App state variables
 username = ""
 password = ""
-conn = None
+conn = None #? this is our connection to the database
 query_history = []
 database_tables = [
     "asteroids",
@@ -45,11 +40,12 @@ database_tables = [
     "tracking_stations", 
 ]
 
-# Function to sanitize SQL clauses to prevent SQL injection
+#? a function to try and prevent SQL injection
 def sanitize(clause):
     if not clause:
         return ""
         
+    #? \s+ matches any whitespace
     suspicious_patterns = [
         r';\s*', r'--', r'/\*', r'\*/', r'DROP\s+', r'DELETE\s+',
         r'UPDATE\s+', r'INSERT\s+', r'ALTER\s+', r'UNION\s+'
@@ -61,13 +57,10 @@ def sanitize(clause):
     
     return clause
 
-# Login callback function
+# psycopg2.connect() will throw an OperationalError if the connection fails so that acts as a good check
 def login_button_callback():
     entered_username = dpg.get_value("username_input")
     entered_password = dpg.get_value("password_input")
-    
-    # Show loading indicator
-    dpg.configure_item("login_status", default_value="Connecting to database...", color=[150, 150, 255])
     
     global conn, username
     try:
@@ -77,15 +70,12 @@ def login_button_callback():
         dpg.hide_item("login_window")
         dpg.show_item("main_window")
         
-        # Initialize table stats when connected
         refresh_table_stats()
         
     except psycopg2.OperationalError as e:
         dpg.configure_item("login_status", default_value=f"Login failed: {e}", color=[255, 100, 100])
 
-# Run SQL query function
 def run_query():
-    # Gather all query components
     select_query = sanitize(dpg.get_value("query_select_input"))
     from_query = sanitize(dpg.get_value("query_from_input"))
     where_query = sanitize(dpg.get_value("query_where_input"))
@@ -95,13 +85,13 @@ def run_query():
     join_query = sanitize(dpg.get_value("query_join_input"))
     on_query = sanitize(dpg.get_value("query_on_input"))
     
-    # Clear previous results
+    # clearing previous results
     if dpg.does_item_exist("results_table"):
         dpg.delete_item("results_table")
         
     dpg.configure_item("query_status", default_value="Executing query...", color=[150, 150, 255])
 
-    # Build the query
+    # building the query, order of the if statements is important!
     query = f"SELECT {select_query} FROM {from_query}"
     
     if join_query:  
@@ -119,7 +109,6 @@ def run_query():
         
     query += ";"
     
-    # Add to query history
     timestamp = datetime.now().strftime("%H:%M:%S")
     query_history.append(f"[{timestamp}] {query}")
     update_history_display()
@@ -129,37 +118,30 @@ def run_query():
     
     try:
         with conn.cursor() as cur:
-            # Rollback any failed transactions first
+            # rollback any failed transactions
             conn.rollback()
             
-            # Record start time
             start_time = datetime.now()
             
-            # Execute query
             cur.execute(query)
             
-            # Fetch results
             headers = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
             
-            # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds()
             
-            # Create a table for the results with styling
+            # using dpg.table to create a table for results
             with dpg.table(tag="results_table", header_row=True, policy=dpg.mvTable_SizingStretchProp,
                         borders_innerH=True, borders_outerH=True, borders_innerV=True,
                         borders_outerV=True, parent="results_container", height=-1):
                 
-                # Add columns with adjusted width based on content
                 for header in headers:
                     dpg.add_table_column(label=header)
                 
-                # Add rows with alternating background colors
                 for row_idx, row_data in enumerate(rows):
                     with dpg.table_row():
                         for cell in row_data:
-                            # Convert all values to string for display
-                            cell_text = str(cell) if cell is not None else "NULL"
+                            cell_text = str(cell) or "NULL"
                             # Add text with color based on data type
                             if isinstance(cell, (int, float)):
                                 dpg.add_text(cell_text, color=[200, 230, 255])
@@ -168,35 +150,32 @@ def run_query():
                             else:
                                 dpg.add_text(cell_text)
                 
-            # Update status with success message
+            # info about the query
             dpg.configure_item("query_status", 
-                            default_value=f"Query executed successfully in {execution_time:.3f}s • {len(rows)} rows returned", 
+                            default_value=f"Query executed successfully in {execution_time:.3f}s | {len(rows)} rows returned", 
                             color=[100, 255, 100])
             
     except Exception as e:
-        conn.rollback()
+        conn.rollback() # we rollback
         dpg.configure_item("query_status", 
                          default_value=f"Error executing query: {e}", 
                          color=[255, 100, 100])
         
-        # Create an empty table to maintain layout
+        # create an empty table to maintain layout, otherwise it didn't look good
         with dpg.table(tag="results_table", header_row=True, parent="results_container", height=100):
             dpg.add_table_column(label="Error")
             with dpg.table_row():
                 dpg.add_text(f"Error: {e}", color=[255, 100, 100])
 
-# Update the history display in the sidebar
 def update_history_display():
     if dpg.does_item_exist("history_list"):
         dpg.delete_item("history_list", children_only=True)
         
-    # Display last 10 queries in reverse order (newest first)
     for query in reversed(query_history[-10:]):
         with dpg.group(parent="history_list"):
             dpg.add_text(query, wrap=300)
             dpg.add_separator()
 
-# Refresh table statistics
 def refresh_table_stats():
     if not conn:
         return
@@ -223,7 +202,7 @@ def refresh_table_stats():
                     color=[255, 100, 100], 
                     parent="table_stats_container")
 
-# Quick query templates
+# some default queries
 def load_query_template(sender, app_data, user_data):
     template_queries = {
         "exoplanet_count": {
@@ -237,23 +216,23 @@ def load_query_template(sender, app_data, user_data):
             "limit": ""
         },
         "largest_stars": {
-            "select": "name, radius, mass, distance, constellation",
+            "select": "name, \"Solar radius\", \"Solar mass\", age",
             "from": "stars",
-            "where": "radius > 50",
+            "where": "\"Solar radius\" IS NOT NULL",
             "join": "",
             "on": "",
             "group": "",
-            "order": "radius DESC",
+            "order": "\"Solar radius\" DESC",
             "limit": "10"
         },
-        "spacecraft_by_agency": {
-            "select": "spacecraft.name, launch_date, mission_type, space_agency.name as agency",
-            "from": "spacecraft",
+        "telescope_and_observations": {
+            "select": "o.date, t.name \"Telescope\", t.spectrum \"Spectrum\", o.textual_info \"info\"",
+            "from": "telescopes t",
             "where": "",
-            "join": "space_agency",
-            "on": "spacecraft.agency_id = space_agency.id",
+            "join": "observations o",
+            "on": "t.id = o.telescope_id",
             "group": "",
-            "order": "space_agency.name",
+            "order": "",
             "limit": ""
         }
     }
@@ -269,10 +248,10 @@ def load_query_template(sender, app_data, user_data):
         dpg.set_value("query_order_input", query["order"])
         dpg.set_value("query_limit_input", query["limit"])
 
-# Create login window with improved styling
+# the login window
 with dpg.window(tag="login_window", label="Nebula Core Login", width=500, height=350, no_close=True, pos=[350, 200]):
     with dpg.group(horizontal=True):
-        # Logo/branding area
+        # cool looking area
         with dpg.child_window(width=150, height=300, border=False):
             dpg.add_spacer(height=40)
             dpg.add_text("NEBULA", color=[100, 150, 255])
@@ -292,7 +271,7 @@ with dpg.window(tag="login_window", label="Nebula Core Login", width=500, height
             dpg.add_spacer(height=20)
             
             dpg.add_text("Username:")
-            dpg.add_input_text(tag="username_input", width=280, hint="postgres")
+            dpg.add_input_text(tag="username_input", width=280, hint="usually postgres")
             dpg.add_spacer(height=10)
             
             dpg.add_text("Password:")
@@ -306,7 +285,7 @@ with dpg.window(tag="login_window", label="Nebula Core Login", width=500, height
             dpg.add_spacer(height=10)
             dpg.add_text("", tag="login_status", color=[0, 0, 0])
 
-# Create main application window with sidebar layout
+# this is the main window
 with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=1200, height=800, 
                show=False, no_close=True, no_collapse=True, no_resize=True):
     
@@ -321,7 +300,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
     
     dpg.add_separator()
     
-    # Main content with sidebar layout
+    # main content area
     with dpg.group(horizontal=True):
         # Sidebar for database info and history
         with dpg.child_window(width=300, height=-1, border=True):
@@ -332,7 +311,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
             with dpg.collapsing_header(label="Query Templates", default_open=True):
                 dpg.add_button(label="Count All Exoplanets", callback=load_query_template, user_data="exoplanet_count", width=-1)
                 dpg.add_button(label="Top 10 Largest Stars", callback=load_query_template, user_data="largest_stars", width=-1)
-                dpg.add_button(label="Spacecraft By Agency", callback=load_query_template, user_data="spacecraft_by_agency", width=-1)
+                dpg.add_button(label="Spacecraft By Agency", callback=load_query_template, user_data="telescope_and_observations", width=-1)
             
             with dpg.collapsing_header(label="Query History", default_open=True):
                 with dpg.child_window(tag="history_list", height=200):
@@ -357,7 +336,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
                     with dpg.group(horizontal=True):
                         with dpg.group():
                             dpg.add_text("JOIN")
-                            dpg.add_combo(tag="query_join_input", items=database_tables, width=350)
+                            dpg.add_input_text(tag="query_join_input", width=350)
                         
                         with dpg.group():
                             dpg.add_text("ON")
@@ -414,7 +393,6 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
                     # Table will be created here when query is run
                     dpg.add_text("Execute a query to see results")
 
-# Set up the viewport and show the window
 dpg.set_primary_window("login_window", True)
 dpg.show_viewport()
 dpg.start_dearpygui()
