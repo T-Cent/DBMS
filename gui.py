@@ -1,3 +1,4 @@
+from textwrap import wrap
 import dearpygui.dearpygui as dpg # type: ignore
 import psycopg2 # type: ignore
 import re
@@ -39,6 +40,7 @@ database_tables = [
     "telescopes",        
     "tracking_stations", 
 ]
+
 
 #? a function to try and prevent SQL injection
 def sanitize(clause):
@@ -149,6 +151,15 @@ def run_query():
                                 dpg.add_text(cell_text, color=[150, 150, 150])
                             else:
                                 dpg.add_text(cell_text)
+                             
+            # clear the query form inputs on success   
+            dpg.set_value("query_select_input", "*"),
+            dpg.set_value("query_where_input", ""),
+            dpg.set_value("query_join_input", ""),
+            dpg.set_value("query_on_input", ""),
+            dpg.set_value("query_group_input", ""),
+            dpg.set_value("query_order_input", ""),
+            dpg.set_value("query_limit_input", "")
                 
             # info about the query
             dpg.configure_item("query_status", 
@@ -250,40 +261,39 @@ def load_query_template(sender, app_data, user_data):
 
 # the login window
 with dpg.window(tag="login_window", label="Nebula Core Login", width=500, height=350, no_close=True, pos=[350, 200]):
+
+
     with dpg.group(horizontal=True):
         # cool looking area
         with dpg.child_window(width=150, height=300, border=False):
             dpg.add_spacer(height=40)
             dpg.add_text("NEBULA", color=[100, 150, 255])
             dpg.add_text("CORE", color=[170, 200, 255])
-            dpg.add_text("DATABASE", color=[100, 150, 255])
             dpg.add_separator()
             dpg.add_spacer(height=10)
             dpg.add_text("Astronomical", color=[150, 150, 200])
             dpg.add_text("Data Explorer", color=[150, 150, 200])
             dpg.add_spacer(height=30)
-            dpg.add_text("v1.0.0", color=[100, 100, 150])
+            dpg.add_text("v0.1.0", color=[100, 100, 150])
         
         # Login form
-        with dpg.group():
+        with dpg.group(pos=[450,150]):
             dpg.add_spacer(height=30)
             dpg.add_text("Please log in to access the database", color=[200, 200, 255])
             dpg.add_spacer(height=20)
             
             dpg.add_text("Username:")
-            dpg.add_input_text(tag="username_input", width=280, hint="usually postgres")
+            dpg.add_input_text(tag="username_input", width=280, hint="usually postgres", callback=login_button_callback, on_enter=True)
             dpg.add_spacer(height=10)
             
             dpg.add_text("Password:")
-            dpg.add_input_text(tag="password_input", password=True, width=280)
+            dpg.add_input_text(tag="password_input", password=True, width=280, callback=login_button_callback, on_enter=True)
             dpg.add_spacer(height=20)
             
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Connect", callback=login_button_callback, width=120, height=30)
                 dpg.add_button(label="Exit", callback=lambda: dpg.stop_dearpygui(), width=120, height=30)
             
-            dpg.add_spacer(height=10)
-            dpg.add_text("", tag="login_status", color=[0, 0, 0])
 
 # this is the main window
 with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=1200, height=800, 
@@ -293,7 +303,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
     with dpg.group(horizontal=True):
         dpg.add_text("", tag="user_welcome", color=[150, 200, 255])
         dpg.add_spacer(width=20)
-        dpg.add_button(label="Refresh Stats", callback=refresh_table_stats, height=23)
+        # dpg.add_button(label="Refresh Stats", callback=refresh_table_stats, height=23)
         
         dpg.add_spacer(width=750)
         dpg.add_button(label="Log Out", callback=lambda: [dpg.hide_item("main_window"), dpg.show_item("login_window")], height=23)
@@ -326,7 +336,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
                     with dpg.group(horizontal=True):
                         with dpg.group():
                             dpg.add_text("SELECT")
-                            dpg.add_input_text(tag="query_select_input", width=350, default_value="*")
+                            dpg.add_input_text(tag="query_select_input", width=350, default_value="*", callback=run_query, on_enter=True)
                         
                         with dpg.group():
                             dpg.add_text("FROM")
@@ -336,35 +346,35 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
                     with dpg.group(horizontal=True):
                         with dpg.group():
                             dpg.add_text("JOIN")
-                            dpg.add_input_text(tag="query_join_input", width=350)
+                            dpg.add_input_text(tag="query_join_input", width=350, callback=run_query, on_enter=True)
                         
                         with dpg.group():
                             dpg.add_text("ON")
-                            dpg.add_input_text(tag="query_on_input", width=350)
+                            dpg.add_input_text(tag="query_on_input", width=350, callback=run_query, on_enter=True)
                     
                     # Third row
                     with dpg.group(horizontal=True):
                         with dpg.group():
                             dpg.add_text("WHERE")
-                            dpg.add_input_text(tag="query_where_input", width=350)
+                            dpg.add_input_text(tag="query_where_input", width=350, callback=run_query, on_enter=True)
                         
                         with dpg.group():
                             dpg.add_text("GROUP BY")
-                            dpg.add_input_text(tag="query_group_input", width=350)
+                            dpg.add_input_text(tag="query_group_input", width=350, callback=run_query, on_enter=True)
                     
                     # Fourth row
                     with dpg.group(horizontal=True):
                         with dpg.group():
                             dpg.add_text("ORDER BY")
-                            dpg.add_input_text(tag="query_order_input", width=350)
+                            dpg.add_input_text(tag="query_order_input", width=350, callback=run_query, on_enter=True)
                         
                         with dpg.group():
                             dpg.add_text("LIMIT")
-                            dpg.add_input_text(tag="query_limit_input", width=350)
+                            dpg.add_input_text(tag="query_limit_input", width=350, callback=run_query, on_enter=True)
                     
                     dpg.add_spacer(height=10)
                     
-                    # Query execution controls
+                    # buttons
                     with dpg.group(horizontal=True):
                         dpg.add_button(label="Execute Query", callback=run_query, width=150, height=30)
                         dpg.add_spacer(width=20)
@@ -380,7 +390,7 @@ with dpg.window(tag="main_window", label="Nebula Core Database Explorer", width=
             
             # Raw query display
             with dpg.collapsing_header(label="Generated SQL", default_open=True):
-                dpg.add_input_text(tag="raw_query_display", multiline=True, width=-1, height=60, readonly=True)
+                dpg.add_text(tag="raw_query_display", wrap=600, color=[150, 150, 255])
             
             # Results section
             with dpg.collapsing_header(label="Query Results", default_open=True):

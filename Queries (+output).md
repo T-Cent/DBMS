@@ -1,14 +1,24 @@
 # Queries
 
+## Welcome
+
+![Welcome](<Screenshot 2025-04-13 165527.png>)
+
+## Interface
+
+![Interface](<Screenshot 2025-04-13 165534.png>)
+
 ## Query 1
 
 A query to select all asteroids discovered after 1940
 
 ```sql
-SELECT * FROM asteroids where 'Discovery Date' > '1940-01-01';
+SELECT * FROM asteroids where "Discovery Date" > '1940-01-01';
 ```
 
 ![Query 1](q1.png)
+
+![Query 1](<Screenshot 2025-04-13 165752.png>)
 
 ## Query 2
 
@@ -20,6 +30,8 @@ SELECT name, orbital_period FROM exoplanets ORDER BY orbital_period LIMIT 5;
 
 ![Query 2](image-11.png)
 
+![Query 3](<Screenshot 2025-04-13 165837.png>)
+
 ## Query 3
 
 A query to find all launch sites operated by a country (and their count)
@@ -29,6 +41,8 @@ SELECT country, count(*) Count, STRING_AGG(name, ', ') 'Launch Sites' FROM launc
 ```
 
 ![Query 3](image-4.png)
+
+![Query 3](<Screenshot 2025-04-13 165946.png>)
 
 ## Query 4
 
@@ -40,6 +54,8 @@ SELECT * FROM stars WHERE 'Solar radius' IS NOT NULL ORDER BY 'Solar radius' DES
 
 ![Query 4](image.png)
 
+![Query 4](<Screenshot 2025-04-13 170141.png>)
+
 ## Query 5
 
 Find all telescopes operating in the infrared spectrum
@@ -49,6 +65,8 @@ SELECT * FROM telescopes WHERE spectrum='Infrared' OR spectrum LIKE '%IR%';
 ```
 
 ![Query 5](image-1.png)
+
+![Query 5](<Screenshot 2025-04-13 170238.png>)
 
 ## Query 6
 
@@ -60,6 +78,8 @@ SELECT * FROM spacecraft WHERE capacity = (SELECT MAX(capacity) FROM spacecraft)
 
 ![Query 6](image-2.png)
 
+![Query 6](<Screenshot 2025-04-13 170338.png>)
+
 ## Query 7
 
 Find the country with the most number of spacecraft
@@ -69,6 +89,8 @@ SELECT name, COUNT(operator) FROM satellites GROUP BY operator ORDER BY COUNT(op
 ```
 
 ![Query 7](image-3.png)
+
+![Query 7](<Screenshot 2025-04-13 170542.png>)
 
 ## Query 8
 
@@ -80,6 +102,8 @@ SELECT * FROM asteroids WHERE diameter > (SELECT AVG(diameter) FROM asteroids WH
 
 ![Query 8](image-5.png)
 
+![Query 8](<Screenshot 2025-04-13 170707.png>)
+
 ## Query 9
 
 Get the telescope info which made it's respective observations
@@ -89,6 +113,8 @@ SELECT o.date, t.name "Telescope", t.spectrum "Spectrum", o.textual_info "Info" 
 ```
 
 ![Query 9](image-6.png)
+
+![Query 9](<Screenshot 2025-04-13 170834.png>)
 
 ## Query 10
 
@@ -102,6 +128,8 @@ SELECT s.*, avg_tmp FROM stars s JOIN (
 
 ![Query 10](image-7.png)
 
+![Query 10](image-17.png)
+
 ## Query 11
 
 Find all (ground based) telescopes located between -100 and 100 longitude and -30 and 30 latitude
@@ -112,6 +140,8 @@ SELECT * FROM telescopes WHERE longitude BETWEEN -100 AND 100 AND latitude BETWE
 
 ![Query 11](image-8.png)
 
+![Query 11](image-13.png)
+
 ## Query 12
 
 Find all asteroids who have been closer to earth than the average
@@ -121,6 +151,8 @@ SELECT * FROM asteroids WHERE "Nominal Distance" < (SELECT AVG("Nominal Distance
 ```
 
 ![Query 12](image-9.png)
+
+![Query 12](image-14.png)
 
 ## Query 13
 
@@ -141,6 +173,8 @@ LIMIT 1;
 
 ![Query 13](image-10.png)
 
+![Query 13](image-15.png)
+
 ## Query 14
 
 Find the number of exoplanets discovered by each instrument
@@ -154,3 +188,7 @@ GROUP BY instrument;
 ```
 
 ![Query 14](image-12.png)
+
+![Query 14](image-16.png)
+
+*Disclaimer, some queries are a little bit wrong, but I lack the bandwidth and the willpower to fix them, take a look at the queries seen in the output to see the correct one.*
